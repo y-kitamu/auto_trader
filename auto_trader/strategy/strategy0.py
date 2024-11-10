@@ -6,11 +6,10 @@ import datetime
 import numpy as np
 import polars as pl
 
-from ...api import gmo
 from ..base import BaseStrategy, BaseTrader, BaseWallet
 from ..types import TickData
 from ..utils.feature import calc_features
-from stock.crypto.types.trade_history import TradeHistory
+from ..utils import gmo
 
 
 def fetch_initial_df(symbol: str, interval: datetime.timedelta):

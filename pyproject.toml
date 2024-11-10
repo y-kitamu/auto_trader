@@ -6,9 +6,53 @@ authors = ["kitamura <ymyk6602@gmail.com>"]
 readme = "README.md"
 
 [tool.poetry.dependencies]
-python = "^3.12"
+python = "^3.11.9,<3.14"
+requests = "^2.31.0"
+requests-cache = "^1.2.0"
+requests-ratelimiter = "^0.6.0"
+requests-html = "^0.10.0"
+fake-useragent = "^1.4.0"
+pydantic = "^2.6.3"
+matplotlib = "^3.8.3"
+polars = "^0.20.18"
+pandas = "^2.2.2"
+numpy = "^1.19.5"
+websocket-client = "^1.8.0"
 
+[tool.poetry.group.dev.dependencies]
+ipykernel = "^6.29.3"
+ipython = "^8.22.2"
+flake8 = "^7.0.0"
+pytest = "^8.0.2"
+nbstripout = "^0.7.1"
+ipywidgets = "^8.1.2"
+epc = "^0.0.5"
+orjson = "^3.9.15"
+sexpdata = "^1.0.2"
+six = "^1.16.0"
+setuptools = "^69.2.0"
+paramiko = "^3.4.0"
+rapidfuzz = "^3.6.2"
+black = "^24.4.2"
 
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
+
+
+[tool.basedpyright]
+include = ["auto_trade/**/*.py"]
+exclude = ["data", "**/node_modules", "**/__pycache__"]
+venvPath = ".venv"
+typeCheckingMode = "standard"
+
+[tool.black]
+line-length = 105
+
+[tool.flake8]
+max-complexity = 10
+max-line-length = 105
+indent-size = 4
+
+[tool.isort]
+known_local_folder = ["auto_trade"]
