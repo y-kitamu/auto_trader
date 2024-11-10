@@ -1,0 +1,38 @@
+# version: '3.9'
+# https://docs.docker.com/compose/environment-variables/envvars/#compose_project_name
+name: "auto_trader"
+
+services:
+  stock:
+    build:
+      context: .
+      args:
+        user:
+        uid:
+        gid:
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - capabilities: ["gpu"]
+    #           driver: nvidia
+    #           device_ids: ["1"]
+    hostname: ${COMPOSE_PROJECT_NAME}
+    ports:
+      # - "8886:8888" # jupyter
+      - "32222:22"  # ssh
+    volumes:
+      - /etc/localtime:/etc/localtime
+      - /etc/passwd:/etc/passwd  # same password, uid, gid with host
+      - /etc/shadow:/etc/shadow
+      - /etc/group:/etc/group
+      - ../:${HOME}/work/${COMPOSE_PROJECT_NAME}
+      - ${HOME}/.bashrc:${HOME}/.bashrc
+      - ${HOME}/.ssh:${HOME}/.ssh
+    environment:
+      SHELL: "/bin/bash"
+      USER_HOME: ${HOME}
+      USER_NAME: ${USER}
+      COMPOSE_PROJECT_NAME: ${COMPOSE_PROJECT_NAME}
+    entrypoint: ${HOME}/work/${COMPOSE_PROJECT_NAME}/docker/entrypoint.sh
+    restart: always
