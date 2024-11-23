@@ -18,6 +18,8 @@ polars = "^0.20.18"
 pandas = "^2.2.2"
 numpy = "^1.19.5"
 websocket-client = "^1.8.0"
+pytest = "^8.3.3"
+data-fetcher = {path = "../data_fetcher", develop = true}
 
 [tool.poetry.group.dev.dependencies]
 ipykernel = "^6.29.3"
@@ -35,10 +37,20 @@ paramiko = "^3.4.0"
 rapidfuzz = "^3.6.2"
 black = "^24.4.2"
 
+
+[tool.poetry.group.development.dependencies]
+isort = "^5.13.2"
+
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
 
+[tool.pytest.ini_options]
+minversion = "6.0"
+addopts = "-ra -q"
+testpaths = [
+    "tests",
+]
 
 [tool.basedpyright]
 include = ["auto_trade/**/*.py"]

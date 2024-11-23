@@ -1,16 +1,15 @@
 """gmo_trader.py
-
-Author : Yusuke Kitamura
-Create Date : 2024-11-09 17:14:20
-Copyright (c) 2019- Yusuke Kitamura <ymyk6602@gmail.com>
 """
 
+import datetime
+
 from ..base import BaseTrader
+from ..types import TradeHistory
 
 
 class GMOTrader(BaseTrader):
-    def buy(self, symbol: str, price: float, volume: float):
-        pass
+    def buy_order(self, symbol: str, price: float, volume: float, deadline: datetime.datetime):
+        return TradeHistory(symbol=symbol, price=price, volume=volume, timestamp=datetime.datetime.now())
 
-    def sell(self, symbol: str, price: float, volume: float):
-        pass
+    def sell_order(self, symbol: str, price: float, volume: float, deadline: datetime.datetime):
+        return TradeHistory(symbol=symbol, price=price, volume=volume, timestamp=datetime.datetime.now())

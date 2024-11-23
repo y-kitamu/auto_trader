@@ -18,7 +18,7 @@ services:
       - /etc/passwd:/etc/passwd  # same password, uid, gid with host
       - /etc/shadow:/etc/shadow
       - /etc/group:/etc/group
-      - ../:${HOME}/work/${COMPOSE_PROJECT_NAME}
+      - ../../:${HOME}/work/
       - ${HOME}/.bashrc:${HOME}/.bashrc
       - ${HOME}/.ssh:${HOME}/.ssh
     environment:

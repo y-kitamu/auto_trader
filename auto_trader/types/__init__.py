@@ -5,3 +5,4 @@
 
 from .tick_data import TickData
 from .trade_history import TradeHistory
+from .order import Order

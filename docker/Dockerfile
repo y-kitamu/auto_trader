@@ -27,3 +27,6 @@ RUN tar -xvf ta-lib-0.4.0-src.tar.gz && \
     make &&\
     make install
 RUN pip install TA-Lib
+
+# jupyter
+RUN pip install jupyterlab

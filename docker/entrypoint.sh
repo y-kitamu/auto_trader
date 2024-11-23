@@ -16,5 +16,7 @@ chown -R ${USER_NAME}:${USER_NAME} ${USER_HOME}
 
 # sudo COMPOSE_PROJECT_NAME=${COMPOSE_PROJECT_NAME} su ${USER_NAME} -c "$(declare -f run_as_user); run_as_user"
 pip install --editable /home/${USER_NAME}/work/${COMPOSE_PROJECT_NAME}/
+pip install --editable /home/${USER_NAME}/work/data_fetcher/
+pip install --editable /home/${USER_NAME}/work/stock/
 
 /usr/sbin/sshd -D
