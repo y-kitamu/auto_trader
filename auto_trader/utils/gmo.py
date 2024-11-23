@@ -18,6 +18,20 @@ CERT_FILE = PROJECT_ROOT / "cert" / "gmo_api.json"
 PUBLIC_END_POINT = "https://api.coin.z.com/public"
 PRIVATE_END_POINT = "https://api.coin.z.com/private"
 
+LEVERAGE_SYMBOLS = [
+    "BTC_JPY",
+    "ETH_JPY",
+    "BCH_JPY",
+    "LTC_JPY",
+    "XRP_JPY",
+    "DOT_JPY",
+    "ATOM_JPY",
+    "ADA_JPY",
+    "LINK_JPY",
+    "DOGE_JPY",
+    "SOL_JPY",
+]
+
 
 def convert_timedelta_to_str(interval: datetime.timedelta):
     """timedeltaをgmoのAPIで使う文字列に変換する"""
@@ -48,8 +62,9 @@ def convert_timedelta_to_str(interval: datetime.timedelta):
     raise ValueError(f"Invalid interval: {interval}")
 
 
-def public_api(path: str, parameters: dict):
-    path += "?{}".format("&".join([f"{k}={v}" for k, v in parameters.items()]))
+def public_api(path: str, parameters: dict = {}):
+    if len(parameters) > 0:
+        path += "?{}".format("&".join([f"{k}={v}" for k, v in parameters.items()]))
     res = requests.get(PUBLIC_END_POINT + path)
     if res["status"] != 0:
         raise RuntimeError(
@@ -121,3 +136,107 @@ def get_ohlc(symbol, interval: str | datetime.timedelta, date=datetime.datetime.
         )
     )
     return df
+
+
+def post_order(symbol: str, price: float, volume):
+    side = "BUY" if volume > 0 else "SELL"
+    if price > 0:
+        params = {
+            "symbol": symbol,
+            "side": side,
+            "executionType": "LIMIT",
+            "timeInForce": "FAS",
+            "price": int(price),
+            "size": abs(volume),
+        }
+    else:
+        params = {
+            "symbol": symbol,
+            "side": side,
+            "executionType": "MARKET",
+            "timeInForce": "FAS",
+            "size": abs(volume),
+        }
+    res = private_api("/v1/order", parameters=params, method="POST")
+    return res
+
+
+def post_leverage_close_order(symbol: int, price: float, volume: float, position_id: int):
+    side = "BUY" if volume > 0 else "SELL"
+    if price > 0:
+        params = {
+            "symbol": symbol,
+            "side": side,
+            "executionType": "LIMIT",
+            "timeInForce": "FAS",
+            "price": int(price),
+            "settlePosition": {
+                "positionId": position_id,
+                "size": abs(volume),
+            },
+        }
+    else:
+        params = {
+            "symbol": symbol,
+            "side": side,
+            "executionType": "MARKET",
+            "timeInForce": "FAS",
+            "settlePosition": {
+                "positionId": position_id,
+                "size": abs(volume),
+            },
+        }
+    res = private_api("/v1/closeOrder", parameters=params, method="POST")
+    return res
+
+
+def is_order_finished(order_id: int) -> bool:
+    """`order_id`の注文が終了状態かどうかを返す"""
+    res = private_api("/v1/orders", parameters={"orderId": order_id}, method="GET")
+    return res["data"]["status"] in ["CANCELED", "EXECUTED", "EXPIRED"]
+
+
+def calc_executed_volume(order_id: int) -> float:
+    """`order_id`の注文で約定済みの数量を求める"""
+    executed_volume = 0.0
+    res = private_api("/v1/executions", parameters={"orderId": order_id}, method="GET")
+    for data in res["data"]["list"]:
+        if data["side"] == "BUY":
+            executed_volume += float(data["size"])
+        elif data["side"] == "SELL":
+            executed_volume -= float(data["size"])
+    return executed_volume
+
+
+def get_all_positions(symbol: str) -> list[dict]:
+    page = 1
+    count = 100
+
+    positions = []
+    while True:
+        res = private_api(
+            "/v1/openPositions",
+            parameters={"symbol": symbol, "page": page, "count": count},
+            method="GET",
+        )
+        positions += res["data"]["list"]
+
+        if len(res["data"]["list"]) != count:
+            break
+        page += 1
+    return positions
+
+
+def get_open_positions(order_id: int) -> list[dict]:
+    res = private_api("/v1/executions", parameters={"orderId": order_id}, method="GET")
+    if len(res["data"]["list"]) == 0:
+        return []
+
+    all_positions = get_all_positions(res["data"]["list"][0]["symbol"])
+    open_positions = []
+    for data in res["data"]["list"]:
+        for pos in all_positions:
+            if pos["positionId"] == data["positionId"]:
+                open_positions.append(pos["positionId"])
+                break
+    return open_positions

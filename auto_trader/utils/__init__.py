@@ -2,4 +2,4 @@
 `base`, `types`以外のディレクトリのファイルをインポートするのは禁止。
 """
 
-from . import gmo
+from . import gmo, history

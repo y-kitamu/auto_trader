@@ -67,4 +67,4 @@ max-line-length = 105
 indent-size = 4
 
 [tool.isort]
-known_local_folder = ["auto_trade"]
+known_local_folder = ["auto_trade", "stock", "data_fetcher"]
