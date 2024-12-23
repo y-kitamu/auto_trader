@@ -19,7 +19,7 @@ class BaseOrder(BaseModel):
     def losscut(self):
         raise NotImplementedError
 
-    def cancel_order(self, order_id: int | None = None):
+    def cancel_order(self, order_id: str | None = None):
         raise NotImplementedError
 
     def check_losscut(self, current_price: float):
@@ -30,3 +30,8 @@ class BaseOrder(BaseModel):
 
     def summary(self):
         raise NotImplementedError
+
+    def __del__(self):
+        # object消滅時には注文をキャンセルする
+        self.cancel_order()
+        self.losscut()

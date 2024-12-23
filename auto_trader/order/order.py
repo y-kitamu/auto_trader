@@ -1,6 +1,7 @@
 """order.py
 """
 
+from ..logging import logger
 from ..utils import gmo
 from .base_order import BaseOrder
 
@@ -10,9 +11,9 @@ class Order(BaseOrder):
 
     symbol: str
     side: str
-    order_id: int
+    order_id: str
     losscut_price: float
-    close_order_id: int = -1
+    close_order_id: str = ""
     closed: bool = False
 
     @staticmethod
@@ -20,7 +21,7 @@ class Order(BaseOrder):
         order = gmo.post_order(symbol, price, volume)
         return Order(
             symbol=symbol,
-            order_id=order,
+            order_id=order["data"],
             losscut_price=losscut_price,
             side="BUY" if volume > 0 else "SELL",
         )
@@ -36,7 +37,7 @@ class Order(BaseOrder):
             executed = gmo.calc_executed_volume(self.order_id)
             if abs(executed) < 1e-5:
                 return True  # 持ち高が0の場合
-            if self.close_order_id < 0:
+            if self.close_order_id == "":
                 return False  # 持ち高がある状態で、反対取引が発行されていない
             if not gmo.is_order_finished(self.close_order_id):
                 return False  # 反対取引が有効な場合
@@ -56,7 +57,7 @@ class Order(BaseOrder):
         self.cancel_order()  # 注文が有効な場合はキャンセル
         executed = gmo.calc_executed_volume(self.order_id)
 
-        if self.close_order_id > 0:  # 反対取引の注文が発行されている場合
+        if self.close_order_id != "":  # 反対取引の注文が発行されている場合
             self.cancel_order(self.close_order_id)
             executed -= gmo.calc_executed_volume(self.order_id)
 
@@ -89,7 +90,7 @@ class Order(BaseOrder):
             return
 
         executed = gmo.calc_executed_volume(self.order_id)
-        if self.close_order_id > 0:
+        if self.close_order_id != "":
             self.cancel_order(self.close_order_id)
             executed -= gmo.calc_executed_volume(self.close_order_id)
 
@@ -100,7 +101,7 @@ class Order(BaseOrder):
         res = gmo.private_api("/v1/executions", parameters={"orderId": self.order_id}, method="POST")
         executions += res["data"]["list"]
 
-        if self.close_order_id > 0:
+        if self.close_order_id != "":
             res = gmo.private_api(
                 "/v1/executions",
                 parameters={"orderId": self.close_order_id},

@@ -1,6 +1,7 @@
 """leverage_order.py
 """
 
+from ..logging import logger
 from ..utils import gmo
 from .base_order import BaseOrder
 
@@ -10,17 +11,20 @@ class LeverageOrder(BaseOrder):
 
     symbol: str
     side: str
-    order_id: int
+    order_id: str
     losscut_price: float
-    close_order_ids: list[int] = []
+    close_order_ids: list[str] = []
     closed: bool = False
 
     @staticmethod
     def new_order(symbol: str, price: float, volume: float, losscut_price: float):
         order = gmo.post_order(symbol, price, volume)
+        logger.info(
+            f"New order : symbol = {symbol}, price = {price}, volume = {volume}, order_id = {order['data']}"
+        )
         return LeverageOrder(
             symbol=symbol,
-            order_id=order,
+            order_id=order["data"],
             losscut_price=losscut_price,
             side="BUY" if volume > 0 else "SELL",
         )
@@ -58,9 +62,19 @@ class LeverageOrder(BaseOrder):
 
         for pos in open_positions:
             res = gmo.post_leverage_close_order(
-                symbol=pos["symbol"], price=-1.0, volume=pos["size"], position_id=pos["positionId"]
+                symbol=pos["symbol"],
+                price=-1.0,
+                volume=pos["size"],
+                position_id=pos["positionId"],
+                side="SELL" if pos["side"] == "BUY" else "BUY",
             )
             self.close_order_ids.append(res["data"]["orderId"])
+
+        logger.info(
+            "losscut order issued : original order_id = {}, close_order_ids = {}".format(
+                self.order_id, ", ".join(self.close_order_ids)
+            )
+        )
         return False
 
     def check_losscut(self, current_price: float):
@@ -77,6 +91,7 @@ class LeverageOrder(BaseOrder):
             order_id = self.order_id
         if not gmo.is_order_finished(order_id):
             gmo.private_api("/v1/cancelOrder", parameters={"orderId": order_id}, method="POST")
+            logger.debug("Order canceled : order_id = {}".format(order_id))
 
     def update_target_price(self, target_price: float):
         """利益確定注文の価格を変更する"""
@@ -100,20 +115,28 @@ class LeverageOrder(BaseOrder):
                     price=target_price,
                     volume=pos["size"],
                     position_id=pos["positionId"],
-                )["data"]["orderId"]
+                    side="SELL" if pos["side"] == "BUY" else "BUY",
+                )["data"]
+            )
+            logger.debug(
+                "Update target price : order_id = {}, target_price = {}, volume = {}, position_id = {}".format(
+                    self.order_id, target_price, pos["size"], pos["positionId"]
+                )
             )
 
     def summary(self):
         executions = []
-        res = gmo.private_api("/v1/executions", parameters={"orderId": self.order_id}, method="POST")
-        executions += res["data"]["list"]
+        res = gmo.private_api("/v1/executions", parameters={"orderId": self.order_id}, method="GET")
+        if "list" in res["data"]:
+            executions += res["data"]["list"]
 
         for order_id in self.close_order_ids:
             res = gmo.private_api(
                 "/v1/executions",
                 parameters={"orderId": order_id},
-                method="POST",
+                method="GET",
             )
-            executions += res["data"]["list"]
+            if "list" in res["data"]:
+                executions += res["data"]["list"]
 
         return executions

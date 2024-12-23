@@ -4,6 +4,7 @@
 import asyncio
 import datetime
 import pickle
+import time
 from pathlib import Path
 
 import polars as pl
@@ -89,23 +90,26 @@ def fetch_df(
     return df
 
 
-class Trader:
+class Trader0:
 
     def __init__(
         self,
         symbol: str,
         interval: datetime.timedelta,
-        data_length: int,
-        volume: float,
         model_path: Path,
         log_dir: Path,
+        wait_second: int = 1,
+        data_length: int = 100,
+        volume: float = 0.01,
     ):
         self.ORDER_TYPE = LeverageOrder if symbol in gmo.LEVERAGE_SYMBOLS else Order
+        self.leverage = 2 if symbol in gmo.LEVERAGE_SYMBOLS else 1
         self.symbol = symbol
         self.interval = interval
         self.data_length = data_length
         current = datetime.datetime.now()
-        next_wall_minute = (current.minute // 15 + 1) * 15
+        interval_minutes = int(interval / datetime.timedelta(minutes=1))
+        next_wall_minute = (current.minute // interval_minutes + 1) * interval_minutes
         offset = 1 if next_wall_minute > 59 else 0
         next_wall_minute = next_wall_minute % 60
         self.next_wall = datetime.datetime(
@@ -116,8 +120,11 @@ class Trader:
             minute=next_wall_minute,
         )
         self.orders: list[BaseOrder] = []
-        self.wait_second = 10
+        self.wait_second = wait_second
         self.log_dir = log_dir
+        self.volume = volume
+
+        self.is_running = False
 
         # modelの読み込み
         with open(model_path, "rb") as f:
@@ -130,12 +137,15 @@ class Trader:
         for order in self.orders:
             for data in latest_data:
                 if data["symbol"] == order.symbol:
-                    order.check_losscut(data["last"])
+                    order.check_losscut(float(data["last"]))
                     break
 
-    def get_order_volume(self) -> float:
+    def get_order_volume(self, price: float) -> float:
         """注文する数量を返す"""
-        return 0.0001
+        res = gmo.private_api("/v1/account/margin", parameters={}, method="GET")
+        if float(res["data"]["availableAmount"]) * self.leverage > self.volume * price:
+            return self.volume
+        return 0.0
 
     def on_new_tick_added(self):
         """新しい価格データが追加された際の処理"""
@@ -144,32 +154,39 @@ class Trader:
             -self.data_length - 1 : -1
         ]
         df = stock.crypto.feature.calc_features(df)
-        feat = df.select(*train_features)
+        feat = df.select(*train_features).to_numpy()
         preds = self.model.predict(feat)
 
         # 発注済みの注文の目標株価を更新
-        target_buy_price = df["close"][-1] - df["ATR"][-1] * 0.5
-        target_sell_price = df["close"][-1] + df["ATR"][-1] * 0.5
+        target_buy_price = df["close"][-1] - df["ATR"][-1] * 0.8
+        target_sell_price = df["close"][-1] + df["ATR"][-1] * 0.8
         for order in self.orders:
+            order.cancel_order()  # 既存の新規注文はキャンセル
             if order.side == "BUY":
                 order.update_target_price(target_sell_price)
             else:
                 order.update_target_price(target_buy_price)
 
         if preds[-1] > 0:  # モデルのスコアが良い場合は新規注文
-            volume = self.get_order_volume()
-            self.orders.append(
-                Order.new_order(self.symbol, target_buy_price, volume, target_buy_price * 0.95)
-            )
+            volume = self.get_order_volume(target_buy_price)
+            if volume > 1e-5:
+                self.orders.append(
+                    self.ORDER_TYPE.new_order(
+                        symbol=self.symbol,
+                        price=target_buy_price,
+                        volume=volume,
+                        losscut_price=target_buy_price * 0.92,
+                    )
+                )
 
-    async def run_loop(self):
-        trade_history_csv = self.log_dir / "trade_history.csv"
-        enable_logging_to_file(
-            self.log_dir / "trader_{}.log".format(datetime.datetime.now().isoformat())
-        )
+    def run_loop(self):
+        self.is_running = True
+        date_str = datetime.datetime.now().isoformat()
+        trade_history_csv = self.log_dir / f"trade_history_{date_str}.csv"
+        enable_logging_to_file(self.log_dir / f"trader_{date_str}.log")
         logger.debug("Start auto trade")
-        fut = asyncio.sleep(self.wait_second)
-        while True:
+        # fut = asyncio.sleep(self.wait_second)
+        while self.is_running:
             self.losscut()  # losscutのチェック
             # next wallに到達した場合の処理
             if self.next_wall < datetime.datetime.now():
@@ -181,5 +198,22 @@ class Trader:
             history.log_closed_order(closed_orders, trade_history_csv)
 
             # loop頻度制御
-            await fut
-            fut = asyncio.sleep(self.wait_second)
+            # await fut
+            # fut = asyncio.sleep(self.wait_second)
+            time.sleep(self.wait_second)
+
+        self.cancel_all_orders()
+        history.log_closed_order(self.orders, trade_history_csv)
+        logger.debug("Stop auto trade")
+
+    def cancel_all_orders(self):
+        is_closed = False
+        while not is_closed:
+            is_closed = True
+            for order in self.orders:
+                order.cancel_order()
+                order.losscut()
+                is_closed &= order.is_closed()
+
+    def stop_loop(self):
+        self.is_running = False

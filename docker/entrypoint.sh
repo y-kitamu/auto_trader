@@ -18,5 +18,6 @@ chown -R ${USER_NAME}:${USER_NAME} ${USER_HOME}
 pip install --editable /home/${USER_NAME}/work/${COMPOSE_PROJECT_NAME}/
 pip install --editable /home/${USER_NAME}/work/data_fetcher/
 pip install --editable /home/${USER_NAME}/work/stock/
+pip install --editable /home/${USER_NAME}/work/crypto/
 
 /usr/sbin/sshd -D
