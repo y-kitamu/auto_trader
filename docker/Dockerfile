@@ -1,10 +1,11 @@
-FROM python:latest
+FROM nvcr.io/nvidia/tensorflow:24.12-tf2-py3
 
 # add user
 RUN apt-get update && apt-get install -y sudo
 ARG uid
 ARG gid
 ARG user
+RUN usermod -u 1001 ubuntu && groupmod -g 1001 ubuntu
 RUN groupadd --gid ${gid} ${user} && useradd -ms /bin/bash --uid ${uid} --gid ${gid} ${user}
 RUN usermod -aG sudo ${user}
 
